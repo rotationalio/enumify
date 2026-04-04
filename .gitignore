@@ -30,3 +30,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Do not track generated example code in order to ensure tests pass.
+example/*_gen.go
