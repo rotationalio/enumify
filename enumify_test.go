@@ -3,9 +3,31 @@ package enumify_test
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"regexp"
+	"testing"
 
+	"github.com/stretchr/testify/require"
 	"go.rtnl.ai/enumify"
 )
+
+//============================================================================
+// Testing Code Generation Utilities
+//============================================================================
+
+// To convey to humans and machine tools that code is generated,
+// generated source should have a line that matches the following
+// regular expression (in Go syntax):
+
+// 	^// Code generated .* DO NOT EDIT\.$
+
+// This line must appear before the first non-comment, non-blank
+// text in the file.
+//
+// From: https://pkg.go.dev/cmd/go/internal/generate#pkg-variables
+func TestGenerateComment(t *testing.T) {
+	regex := regexp.MustCompile(`^Code generated .* DO NOT EDIT\.$`)
+	require.True(t, regex.MatchString(enumify.GenerateComment()))
+}
 
 //============================================================================
 // Enum type for testing the library
