@@ -67,7 +67,7 @@ func (s *Status) UnmarshalYAML(unmarshal func(any) error) (err error) {
 	if err = unmarshal(&v); err != nil {
 		return err
 	}
-	*s, err = enumify.ParseFactory[Status](StatusNames)(s)
+	*s, err = enumify.ParseFactory[Status](StatusNames)(v)
 	return err
 }
 

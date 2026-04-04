@@ -212,17 +212,16 @@ func (s *TestSuite[T, Names]) InvalidCases() []any {
 }
 
 func mixedCase(s string) string {
-	b := make([]rune, len(s))
-	for i, r := range s {
+	sb := strings.Builder{}
+	for _, r := range s {
 		// Flip a coin and make the character upper or lower case
 		if rand.Intn(2) == 0 {
-			r = unicode.ToLower(r)
+			sb.WriteRune(unicode.ToLower(r))
 		} else {
-			r = unicode.ToUpper(r)
+			sb.WriteRune(unicode.ToUpper(r))
 		}
-		b[i] = r
 	}
-	return string(b)
+	return sb.String()
 }
 
 func addSpaces(s string) string {
@@ -232,12 +231,23 @@ func addSpaces(s string) string {
 }
 
 func mangle(s string) string {
-	b := make([]rune, len(s))
-	for i := range s {
-		// Flip a coin and make the character upper or lower case
-		if rand.Intn(100) < 25 {
-			b[i] = rune(rand.Intn(10) + 48)
+	sb := strings.Builder{}
+	mangled := false
+	for _, c := range s {
+		// 40% chance to mangle the character
+		if rand.Intn(100) < 40 {
+			r := rune(rand.Intn(93) + 33) // 33-126
+			sb.WriteRune(r)
+			mangled = r != c && unicode.ToLower(r) != unicode.ToLower(c)
+		} else {
+			sb.WriteRune(c)
 		}
 	}
-	return string(b)
+
+	if !mangled {
+		for i := 0; i < rand.Intn(4)+1; i++ {
+			sb.WriteRune(rune(rand.Intn(93) + 33)) // 33-126
+		}
+	}
+	return sb.String()
 }
