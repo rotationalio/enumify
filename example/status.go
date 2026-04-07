@@ -28,3 +28,6 @@ var statusTable = [][]string{
 	{"unknown", "pending", "running", "failed", "success", "cancelled"},
 	{"text-secondary", "text-info", "text-primary", "text-danger", "text-success", "text-warning"},
 }
+
+// This is an unrelated type that should be ignored by the enumify generator.
+type Foo struct{}

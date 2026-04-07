@@ -33,3 +33,4 @@ go.work.sum
 
 # Do not track generated example code in order to ensure tests pass.
 example/*_gen.go
+example/*_gen_test.go
