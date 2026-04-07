@@ -8,11 +8,13 @@ import (
 	"testing"
 	"unicode"
 
+	g "github.com/dave/jennifer/jen"
 	"github.com/stretchr/testify/require"
 )
 
 var (
 	DefaultInvalid = []any{"foo", "123", "INVALID", 257, -1, 314.314, struct{}{}, true, false}
+	TestingT       = g.Params(g.Id("t").Op("*").Qual("testing", "T"))
 )
 
 const (

@@ -18,6 +18,8 @@ func main() {
 
 	// Bind flag variables directly to the opts struct
 	flag.StringVar(&opts.NameVar, "names", "", "variable name that contains the string reprs of the enum values")
+	flag.BoolVar(&opts.CaseSensitive, "case-sensitive", false, "make the enum case sensitive")
+	flag.BoolVar(&opts.SpaceSensitive, "space-sensitive", false, "make the enum space sensitive")
 	flag.BoolVar(&opts.NoTests, "no-tests", false, "skip testing code generation")
 	flag.BoolVar(&opts.NoParser, "no-parser", false, "skip parser code generation")
 	flag.BoolVar(&opts.NoStringer, "no-stringer", false, "skip Stringer interface code generation")

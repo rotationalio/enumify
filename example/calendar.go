@@ -26,7 +26,7 @@ const (
 // and because it matches the dayNames pattern to connect it with the Day enum.
 //
 //lint:ignore U1000 this is used by the enumify generator
-var dayNames = [...]string{
+var dayNames = []string{
 	"unknown",
 	"Monday",
 	"Tuesday",
@@ -61,7 +61,7 @@ const (
 // having to specify it using the -names flag.
 //
 //lint:ignore U1000 this is used by the enumify generator
-var monthNames = [2][13]string{
+var monthNames = [][]string{
 	{"", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"},
 	{"", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"},
 }

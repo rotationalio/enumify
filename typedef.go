@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"go/constant"
 	"go/types"
-	"unicode"
 
+	g "github.com/dave/jennifer/jen"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -20,8 +20,63 @@ type EnumType struct {
 	scope    *types.Scope
 }
 
+//============================================================================
+// EnumType Code Generation Utilities
+//============================================================================
+
+func (e *EnumType) Id() *g.Statement {
+	return g.Id(e.Name)
+}
+
+func (e *EnumType) NamesVarId() *g.Statement {
+	return g.Id(e.NamesVar.Name())
+}
+
+func (e *EnumType) NamesVarTypeId() *g.Statement {
+	switch {
+	case isStringTable(e.NamesVar.Type()):
+		return g.Id("[][]string")
+	case isStringSlice(e.NamesVar.Type()):
+		return g.Id("[]string")
+	default:
+		panic(fmt.Errorf("unsupported names variable type: %T", e.NamesVar.Type()))
+	}
+}
+
+func (e *EnumType) IndexNames(i g.Code) *g.Statement {
+	switch {
+	case isStringTable(e.NamesVar.Type()):
+		return e.NamesVarId().Index(g.Lit(0)).Index(i)
+	case isStringSlice(e.NamesVar.Type()):
+		return e.NamesVarId().Index(i)
+	default:
+		panic(fmt.Errorf("unsupported names variable type: %T", e.NamesVar.Type()))
+
+	}
+}
+
+func (e *EnumType) ConstLiteral() *g.Statement {
+	constLits := make([]g.Code, 0, len(e.Consts))
+	for _, constObj := range e.Consts {
+		constLit := g.Id(constObj.Name())
+		constLits = append(constLits, constLit)
+	}
+	return g.Id("[]" + e.Name).Add(g.Values(constLits...))
+}
+
+func (e *EnumType) ZeroConstId() *g.Statement {
+	if zeroConst := e.zeroConst(); zeroConst != nil {
+		return g.Id(zeroConst.Name())
+	}
+	return g.Lit(0)
+}
+
+//============================================================================
+// EnumType AST Validation and Parsing
+//============================================================================
+
 func (e *EnumType) validate() error {
-	// Not sure how this would happen ... but we're going to LBYL becuase types are hard.
+	// Not sure how this would happen ... but we're going to LBYL because types are hard.
 	if e.Name == "" || e.Type == nil {
 		return fmt.Errorf("enum type %q has no name or type", e.Name)
 	}
@@ -133,11 +188,15 @@ func (e *EnumType) setNamesVar(name string) error {
 }
 
 func (e *EnumType) namesMatch(name string) bool {
-	chr := []rune(e.Name)[0]
-	ucc := string(unicode.ToUpper(chr)) + e.Name[1:] + "Names"
-	lcc := string(unicode.ToLower(chr)) + e.Name[1:] + "Names"
+	target := e.Name + "Names"
+	ucc := UpperFirst(target)
+	lcc := LowerFirst(target)
 	return name == ucc || name == lcc
 }
+
+//============================================================================
+// Helper Functions
+//============================================================================
 
 func isNamesType(typ types.Type) bool {
 	return isStringArray(typ) || isStringSlice(typ) || isStringTable(typ) || isStrings2DArray(typ)
