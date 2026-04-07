@@ -139,6 +139,7 @@ func Generate(opts Options) (err error) {
 	// Manage import names
 	f.ImportName("go.rtnl.ai/enumify", "enumify")
 	f.ImportName("encoding/json", "json")
+	f.ImportName("database/sql/driver", "driver")
 
 	var etypes EnumTypes
 	if etypes, err = Discover(opts); err != nil {
@@ -147,8 +148,12 @@ func Generate(opts Options) (err error) {
 
 	// Write the code for the enum types.
 	for _, etype := range etypes {
-		typeID := etype.Id()
-		namesVar := etype.NamesVarId()
+		evar := g.Id("err")                       // err variable name
+		s := etype.ReceiverId()                   // e if Enum or s if Status etc.
+		ptrS := g.Op("*").Add(etype.ReceiverId()) // *e if Enum or *s if Status etc.
+		typeID := etype.Id()                      // Enum
+		namesVar := etype.NamesVarId()            // enumNames
+		namesVarSlice := etype.NamesVarSliceId()  // enumNames or enumNames[0]
 
 		f.Comment("//============================================================================")
 		f.Comment("// " + etype.Name + " Enum Type: Generated Functions and Methods")
@@ -168,13 +173,12 @@ func Generate(opts Options) (err error) {
 
 			f.Commentf("Parse%s parses the given value into a %s.", etype.Name, etype.Name)
 			parserFunc := f.Func().Id("Parse" + UpperFirst(etype.Name))
-			parserFunc.Params(g.Id("s").Any()).Params(typeID, g.Error()).Block(
-				g.Return(parserVar.Clone().Call(g.Id("s"))),
+			parserFunc.Params(s.Clone().Any()).Params(typeID, g.Error()).Block(
+				g.Return(parserVar.Clone().Call(s.Clone())),
 			)
 			f.Line()
 		}
 
-		s := g.Id("s")
 		methodSig := g.Func().Params(s.Clone().Add(typeID))
 		methodPtrSig := g.Func().Params(s.Clone().Op("*").Add(typeID))
 
@@ -184,7 +188,7 @@ func Generate(opts Options) (err error) {
 
 			method := methodSig.Clone().Id("String").Call().String()
 			method.Block(
-				g.If(s.Clone().Op(">=").Add(typeID).Call(g.Len(namesVar))).Block(
+				g.If(s.Clone().Op(">=").Add(typeID).Call(g.Len(namesVarSlice))).Block(
 					g.Return(etype.IndexNames(etype.ZeroConstId())),
 				),
 				g.Return(etype.IndexNames(s)),
@@ -204,22 +208,89 @@ func Generate(opts Options) (err error) {
 			f.Line()
 
 			f.Commentf("Ensure %s implements json.Unmarshaler.", etype.Name)
-			method = methodPtrSig.Clone().Id("UnmarshalJSON").Call(g.Id("data").Id("[]byte")).Params(g.Id("err").Error())
+
+			sv := g.Id("sv")
+			method = methodPtrSig.Clone().Id("UnmarshalJSON").Call(g.Id("data").Id("[]byte")).Params(evar.Clone().Error())
 			method.Block(
-				g.Var().Id("v").Any(),
+				g.Var().Add(sv).Any(),
 				g.If(
-					g.Id("err").Op("=").Qual("encoding/json", "Unmarshal").Call(g.Id("data"), g.Op("&").Id("v")).Op(";").Id("err").Op("!=").Nil()).
+					evar.Clone().Op("=").Qual("encoding/json", "Unmarshal").Call(g.Id("data"), g.Op("&").Add(sv)).Op(";").Id("err").Op("!=").Nil()).
 					Block(
-						g.Return(g.Id("err")),
+						g.Return(evar),
 					),
 				g.Line(),
 				g.If(
-					g.Op("*").Add(s).Op(",").Id("err").Op("=").Id("Parse"+etype.Name).Call(g.Id("v")).Op(";").Id("err").Op("!=").Nil().
+					ptrS.Clone().Op(",").Id("err").Op("=").Id("Parse"+etype.Name).Call(sv).Op(";").Id("err").Op("!=").Nil().
 						Block(
-							g.Return(g.Id("err")),
+							g.Return(evar),
 						),
 				),
 				g.Return().Nil(),
+			)
+			f.Add(method)
+			f.Line()
+		}
+
+		// YAML Marshal and Unmarshal code
+		if !opts.NoYAML {
+			f.Commentf("Ensure %s implements yaml.Marshaler.", etype.Name)
+			method := methodSig.Clone().Id("MarshalYAML").Call().Params(g.Any(), g.Error())
+			method.Block(
+				g.Return(s.Clone().Dot("String").Call(), g.Nil()),
+			)
+			f.Add(method)
+			f.Line()
+
+			f.Commentf("Ensure %s implements yaml.Unmarshaler.", etype.Name)
+
+			sv := g.Id("sv")
+			method = methodPtrSig.Clone().Id("UnmarshalYAML").Call(g.Id("unmarshal").Func().Params(g.Any()).Params(g.Error())).Params(evar.Clone().Error())
+			method.Block(
+				g.Var().Add(sv).String(),
+				g.If(evar.Clone().Op("=").Id("unmarshal").Call(g.Op("&").Add(sv)).Op(";").Id("err").Op("!=").Nil()).Block(
+					g.Return(evar),
+				),
+				g.Line(),
+				g.If(g.Add(ptrS.Clone()).Op(",").Id("err").Op("=").Id("Parse"+etype.Name).Call(sv).Op(";").Id("err").Op("!=").Nil().
+					Block(
+						g.Return(evar),
+					),
+				),
+				g.Return(g.Nil()),
+			)
+			f.Add(method)
+			f.Line()
+		}
+
+		// SQL Scanner and Valuer code
+		if !opts.NoSQL {
+			f.Commentf("Ensure %s implements sql.Scanner.", etype.Name)
+			val := g.Id("val")
+			method := methodPtrSig.Clone().Id("Scan").Call(g.Id("src").Any()).Params(evar.Clone().Error())
+			method.Block(
+				g.Switch(val.Clone().Op(":=").Id("src").Assert(g.Type())).Block(
+					g.Case(g.Nil()).Block(g.Return(g.Nil())),
+					g.Case(g.String()).Block(
+						g.List(ptrS.Clone(), evar.Clone().Op("=").Id("Parse"+etype.Name).Call(val)),
+						g.Return(evar),
+					),
+					g.Case(g.Id("[]byte")).Block(
+						g.List(ptrS.Clone(), evar.Clone().Op("=").Id("Parse"+etype.Name).Call(g.String().Call(val))),
+						g.Return(evar),
+					),
+					g.Default().Block(
+						g.Return(g.Qual("fmt", "Errorf").Call(g.Lit("cannot scan %T into "+etype.Name), val)),
+					),
+				),
+			)
+
+			f.Add(method)
+			f.Line()
+
+			f.Commentf("Ensure %s implements driver.Valuer.", etype.Name)
+			method = methodSig.Clone().Id("Value").Call().Params(g.Qual("database/sql/driver", "Value"), g.Error())
+			method.Block(
+				g.Return(s.Clone().Dot("String").Call(), g.Nil()),
 			)
 			f.Add(method)
 			f.Line()

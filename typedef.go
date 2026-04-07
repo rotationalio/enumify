@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"go/constant"
 	"go/types"
+	"slices"
+	"unicode"
+	"unicode/utf8"
 
 	g "github.com/dave/jennifer/jen"
 	"golang.org/x/tools/go/packages"
@@ -28,6 +31,19 @@ func (e *EnumType) Id() *g.Statement {
 	return g.Id(e.Name)
 }
 
+func (e *EnumType) ReceiverId() *g.Statement {
+	if e.Name == "" {
+		return g.Id("e")
+	}
+
+	r, _ := utf8.DecodeRuneInString(e.Name)
+	if r == utf8.RuneError {
+		return g.Id("e")
+	}
+
+	return g.Id(string(unicode.ToLower(r)))
+}
+
 func (e *EnumType) NamesVarId() *g.Statement {
 	return g.Id(e.NamesVar.Name())
 }
@@ -38,6 +54,17 @@ func (e *EnumType) NamesVarTypeId() *g.Statement {
 		return g.Id("[][]string")
 	case isStringSlice(e.NamesVar.Type()):
 		return g.Id("[]string")
+	default:
+		panic(fmt.Errorf("unsupported names variable type: %T", e.NamesVar.Type()))
+	}
+}
+
+func (e *EnumType) NamesVarSliceId() *g.Statement {
+	switch {
+	case isStringTable(e.NamesVar.Type()):
+		return e.NamesVarId().Index(g.Lit(0))
+	case isStringSlice(e.NamesVar.Type()):
+		return e.NamesVarId()
 	default:
 		panic(fmt.Errorf("unsupported names variable type: %T", e.NamesVar.Type()))
 	}
@@ -127,10 +154,8 @@ func (e *EnumType) validate() error {
 
 func (e *EnumType) zeroConst() types.Object {
 	for _, obj := range e.Consts {
-		if c, ok := obj.(*types.Const); ok {
-			if v, ok := constant.Uint64Val(c.Val()); ok && v == 0 {
-				return obj
-			}
+		if v, err := constValue(obj); err == nil && v == 0 {
+			return obj
 		}
 	}
 	return nil
@@ -163,6 +188,13 @@ func (e *EnumType) discover() {
 			continue
 		}
 	}
+
+	// Sort the consts by their values.
+	slices.SortFunc(e.Consts, func(i, j types.Object) int {
+		valI, _ := constValue(i)
+		valJ, _ := constValue(j)
+		return int(valI - valJ)
+	})
 }
 
 func (e *EnumType) setNamesVar(name string) error {
@@ -235,4 +267,14 @@ func isStrings2DArray(typ types.Type) bool {
 		return false
 	}
 	return isStringArray(outer.Elem())
+}
+
+func constValue(obj types.Object) (uint64, error) {
+	if c, ok := obj.(*types.Const); ok {
+		if v, ok := constant.Uint64Val(c.Val()); ok {
+			return v, nil
+		}
+		return 0, fmt.Errorf("const %q has no uint64 value", obj.Name())
+	}
+	return 0, fmt.Errorf("%q is not a constant", obj.Name())
 }
