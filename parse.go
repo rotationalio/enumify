@@ -1,6 +1,7 @@
 package enumify
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -47,6 +48,11 @@ func ParseFactory[T ~uint8, Names []string | [][]string](names Names) Parser[T] 
 	unknown := T(0)
 
 	return func(val any) (T, error) {
+		// Convert byte slices to strings.
+		if v, ok := val.([]byte); ok && len(v) > 1 {
+			val = string(v)
+		}
+
 		switch v := val.(type) {
 		case string:
 			v = normalize(v)
@@ -65,6 +71,15 @@ func ParseFactory[T ~uint8, Names []string | [][]string](names Names) Parser[T] 
 
 			// If no match is found, return an error.
 			return unknown, fmt.Errorf("invalid %T value: %q", unknown, v)
+		case []byte:
+			switch len(v) {
+			case 0:
+				return unknown, nil
+			case 1:
+				return T(v[0]), nil
+			default:
+				panic(errors.New("byte slices should be parsed as strings: this code should be unreachable"))
+			}
 		case T:
 			if v >= T(len(normalizedNames)) {
 				return unknown, fmt.Errorf("invalid %T value: %d", unknown, v)
