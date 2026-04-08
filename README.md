@@ -1,5 +1,7 @@
 # Enumify
 
+[![CI Tests](https://github.com/rotationalio/enumify/actions/workflows/tests.yaml/badge.svg)](https://github.com/rotationalio/enumify/actions/workflows/tests.yaml)
+
 **Easily create and manage typed enumerations with code generation and automated enum tests.**
 
 We found ourselves generating a lot of boilerplate code for our Enums: particularly for parsing, serialization/deserialization, database storage, and tests. Really we just want to be able to describe an Enum and get all of this code for free! Enumify is the combination of a code generator for the boilerplate code as well as a package for reducing the boilerplate and ensuring that everything works as expected.
