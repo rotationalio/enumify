@@ -11,6 +11,8 @@ on:
 jobs:
   go-lint:
     name: Go Lint
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - name: Setup Go
@@ -29,6 +31,8 @@ jobs:
 
   go-test:
     name: Go Test
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     env:
       GOPATH: ${{ github.workspace }}/go
@@ -60,6 +64,8 @@ jobs:
 
   build:
     name: Go Build
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     env:
       GOPATH: ${{ github.workspace }}/go
