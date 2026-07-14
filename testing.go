@@ -18,17 +18,18 @@ var (
 )
 
 const (
-	DBCharLimit = 16
+	DBCharLimit = 32
 )
 
 type TestSuite[T ~uint8, Names []string | [][]string] struct {
-	Values   []T       // the ordered enum values
-	Names    Names     // the names of the enum values
-	Invalid  []any     // any invalid values to test
-	ICase    bool      // whether the enum is case insensitive (adds multi-case tests) defaults to true
-	ISpace   bool      // whether the enum is space insensitive (adds space repr tests) defaults to true
-	parser   Parser[T] // parsing function created by ParseFactory
-	unknowns string    // the string representation of the unknown value
+	Values      []T       // the ordered enum values
+	Names       Names     // the names of the enum values
+	Invalid     []any     // any invalid values to test
+	ICase       bool      // whether the enum is case insensitive (adds multi-case tests) defaults to true
+	ISpace      bool      // whether the enum is space insensitive (adds space repr tests) defaults to true
+	DBCharLimit int       // the maximum length of a string representation for the database (defaults to 32)
+	parser      Parser[T] // parsing function created by ParseFactory
+	unknowns    string    // the string representation of the unknown value
 }
 
 //============================================================================
@@ -116,10 +117,15 @@ func (s *TestSuite[T, Names]) TestDatabase(t *testing.T) {
 	// TODO: implement scan and value tests
 	t.Run("VARCHAR", func(t *testing.T) {
 		// Ensure that all string representations are less than or equal to the db VARCHAR limit
+		var limit int = s.DBCharLimit
+		if limit == 0 {
+			limit = DBCharLimit
+		}
+
 		for _, enum := range s.Values {
 			s, ok := any(enum).(fmt.Stringer)
 			require.True(t, ok, "expected %T to be a fmt.Stringer", enum)
-			require.LessOrEqual(t, len(s.String()), DBCharLimit, "expected %T value %q to be less than or equal to %d characters", enum, s.String(), DBCharLimit)
+			require.LessOrEqual(t, len(s.String()), limit, "expected %T value %q to be less than or equal to %d characters", enum, s.String(), limit)
 		}
 	})
 }
